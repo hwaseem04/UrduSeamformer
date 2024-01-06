@@ -1,6 +1,5 @@
 '''
-Train File for scribble 
-and binary branch training.
+Train File for scribble branch
 '''
 
 # Library Imports 
@@ -19,7 +18,7 @@ import argparse
 # File Imports 
 from dataloader import *
 from utils import *
-from network import SeamFormer 
+from network import UrduSeamFormer 
 from utils import imvisualize, computePSNR
 
 # Global Settings 
@@ -44,7 +43,7 @@ def buildModel(settings):
         mlp_dim = 2048)
     
     # Full model
-    network =  SeamFormer(encoder = v,
+    network =  UrduSeamFormer(encoder = v,
         decoder_dim = encoder_dim,      
         decoder_depth = encoder_layers,
         decoder_heads = encoder_heads,
@@ -60,13 +59,7 @@ def buildModel(settings):
             sys.exit()
 
     # Freezing the model based on scribble/binarisation training.
-    if settings['train_binary']:
-        # Freezing every trainable parameter with scr 
-        for name, param in network.named_parameters():
-            if param.requires_grad and name.find("scr")>=0 :
-                param.requires_grad = False
-
-    elif settings['train_scribble']:
+    if settings['train_scribble']:
         for name, param in network.named_parameters():
             if param.requires_grad and not name.find("scr")>=0 :
                 param.requires_grad = False 
@@ -82,7 +75,7 @@ def buildModel(settings):
         network.load_state_dict(binary_model_dict,strict=True)
         
     else:
-        print('Neither scribble_train nor binary_train , Exiting !')
+        print('Not set to scribble_train  , Exiting !')
         sys.exit()
 
     network = network.to(device)
@@ -98,7 +91,6 @@ def get_lr(optimizer):
 
 # Validation framework 
 def validateNetwork(epoch,network,settings,validloader,vis=True):
-    batch_size = np.int32(settings['batch_size'])
     patch_size = np.int32(settings['patchsize'])
     image_size = np.int32(settings['imgsize'])
     losses = 0
@@ -117,12 +109,8 @@ def validateNetwork(epoch,network,settings,validloader,vis=True):
                 loss_criterion = torch.nn.BCEWithLogitsLoss(pos_weight=weight, reduction='none')
                 # Forward Pass 
                 if settings['train_scribble']:
-                    loss,gt_patches,pred_pixel_values = network(inputs,gt_bin_img=None,gt_scr_img=outputs,criterion=loss_criterion,strain=True,btrain=False,mode='train')
-                # Forward Pass - strain 
-                if settings['train_binary']:
-                    loss,gt_patches,pred_pixel_values= network(inputs,gt_bin_img=outputs,gt_scr_img=None,criterion=loss_criterion,strain=False,btrain=True,mode='train')
-                    psnr += computePSNR(gt_patches,pred_pixel_values,PIXEL_MAX=1.0) 
-
+                    loss,gt_patches,pred_pixel_values = network(inputs, gt_scr_img=outputs,criterion=loss_criterion, mode='train')
+                
                 # Reconstruct 
                 rec_images = rearrange(pred_pixel_values, 'b (h w) (p1 p2 c) -> b c (h p1) (w p2)',p1 = patch_size, p2 = patch_size, h=image_size//patch_size)
                 # Visualisation 
@@ -202,10 +190,7 @@ def trainNetwork(settings,min_samples=100):
 
                 # Forward Pass - btrain 
                 if settings['train_scribble']:
-                    loss,_,_ = network(inputs,gt_bin_img=None,gt_scr_img=outputs,criterion=loss_criterion,strain=settings['train_scribble'],btrain=settings['train_binary'],mode=settings['mode'])
-                # Forward Pass - strain 
-                if settings['train_binary']:
-                    loss,_,_ = network(inputs,gt_bin_img=outputs,gt_scr_img=None,criterion=loss_criterion,strain=settings['train_scribble'],btrain=settings['train_binary'],mode=settings['mode'])
+                    loss,_,_ = network(inputs,gt_scr_img=outputs,criterion=loss_criterion,mode=settings['mode'])
                 
                 # backward pass
                 loss.backward()
@@ -234,6 +219,7 @@ def trainNetwork(settings,min_samples=100):
         if settings['enabledWandb']:
             wandb.log({'epoch':epoch,'num_batches':iters})
             wandb.log({'epoch':epoch,'train_loss':trainLoss})
+            wandb.log({'epoch':epoch,'validation_loss':validationLoss})
             wandb.log({'epoch':epoch,'lr':get_lr(optimizer)})
             
         # Saving Model Weights ( Periodically & Best Model Weights )
@@ -254,7 +240,6 @@ if __name__ == "__main__":
     # Overriding parameters
     parser.add_argument("--mode", type=str,default=None,help='train/test')
     parser.add_argument("--train_scribble", action="store_true", help="Enables Scribble Training")
-    parser.add_argument("--train_binary", action="store_true", help="Enables Binary Training") 
     # To Enable WandB 
     parser.add_argument("--wandb", action="store_true", help="Enables Automatic WandB Logging")
 
@@ -270,10 +255,6 @@ if __name__ == "__main__":
     # Override btrain,strain flag and make is required paramter.
     if args.train_scribble:
         settings['train_scribble']=True
-        settings['train_binary']=False
-    if args.train_binary:
-        settings['train_binary']=True
-        settings['train_scribble']=False
     if args.mode is not None:
         settings['mode']=args.mode 
     if args.wandb:
@@ -281,7 +262,7 @@ if __name__ == "__main__":
 
     if settings['enabledWandb']:
         print('------------- Logging into WandB -------------')
-        wandb.init(project="SeamFormer_Experiments",id=configs['wid'],resume='allow',config=configs)
+        wandb.init(project=configs['expName'],id=configs['wid'],resume='allow',config=configs)
         
     # Prepare directories for storing model and visual results.
     os.makedirs(configs['model_weights_path'],exist_ok=True)
