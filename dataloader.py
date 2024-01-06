@@ -72,9 +72,6 @@ class ScribbleDataset(D.Dataset):
         if self.config['train_scribble']:
             imageURL = self.base_dir+'{}_{}_patches'.format(self.config['dataset_code'],self.set)+'/images/'+file_name
             gtURL = self.base_dir+'{}_{}_patches'.format(self.config['dataset_code'],self.set)+'/scribbleMap/'+file_name.replace('im_','sm_')
-        if self.config['train_binary']:
-            imageURL = self.base_dir+'{}_{}_patches'.format(self.config['dataset_code'],self.set)+'/images/'+file_name
-            gtURL = self.base_dir+'{}_{}_patches'.format(self.config['dataset_code'],self.set)+'/binaryImages/'+file_name.replace('im_','bm_')
         
         if not (os.path.exists(imageURL) or not(os.path.exists(gtURL))):
             print("Image {} DOES NOT exists at the specified location.".format(imageURL))
