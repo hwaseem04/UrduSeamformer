@@ -7,6 +7,9 @@ Urdu Documents with Seamformer </h2>
 
 </div>
 
+The preprint can be accessed here: [Advancing Text Line Segmentation in Complex
+Urdu Documents with Seamformer](https://drive.google.com/file/d/1x6jDApziX_JqaxXyLXXKkozS0l05tbaZ/view?usp=drive_link)
+
 This is a forked repository from the original [Seamformer](https://github.com/ihdia/seamformer) repository. 
 
 ## Table of contents
